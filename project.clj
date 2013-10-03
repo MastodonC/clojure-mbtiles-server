@@ -1,6 +1,6 @@
 (defproject mb-server "0.1.0-SNAPSHOT"
-  :description "MB tiles server"
-  :url ""
+  :description "MBTiles server"
+  :url "https://github.com/MastodonC/clojure-mbtiles-server"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.5.1"]
