@@ -7,7 +7,8 @@
                  [org.clojure/java.jdbc "0.3.0-alpha5"]
 		 [org.xerial/sqlite-jdbc "3.7.2"]
 		 [compojure "1.1.5"]
-                 [org.clojure/math.numeric-tower "0.0.2"]]
+                 [org.clojure/math.numeric-tower "0.0.2"]
+                 [org.clojure/data.json "0.2.3"]]
   :plugins [[lein-ring "0.8.5"]]
   :ring {:handler mb-server.core/app}
   :source-paths ["src"]
