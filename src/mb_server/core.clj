@@ -9,10 +9,10 @@
   (use compojure.core)
   (:import java.util.zip.InflaterInputStream))
 
-(def db-belonging {:classname  "org.sqlite.JDBC",
-          	     :subprotocol   "sqlite",
-                         :subname	    "resources/sl_belonging.mbtiles"})
-
+(defn db-specs [name]
+  {:classname     "org.sqlite.JDBC",
+   :subprotocol   "sqlite",
+   :subname	  (str "resources/" name ".mbtiles")})
 
 (defn zlib-decompress
   [input]
@@ -20,8 +20,8 @@
     (slurp input)))
 
 ;; TILES
-(defn tile-result [z x y]
-  (j/with-connection db-belonging
+(defn tile-result [d z x y]
+  (j/with-connection (db-specs d)
     (j/with-query-results results ["SELECT tile_data FROM tiles WHERE zoom_level = ? AND tile_column = ? AND tile_row = ?" z x y]
       (first results))))
 
@@ -30,20 +30,17 @@
    :headers {"Content-Type" "image/png"}
    :body (new java.io.ByteArrayInputStream (:tile_data tile))})
 
-(defn get-tile [z x y]
-  (let [tile (tile-result z x y)]
+(defn get-tile [d z x y]
+  (let [tile (tile-result d z x y)]
     (if (nil? tile)
       {:status 404}
       (tile-response tile))))
 
-
 ;; GRIDS
-
 (defn numbers-as-strings? [& strings]
 ;; (infof "Numbers as strings: %s" strings)
   (every? #(re-find #"^-?\d+(?:\.\d+)?$" %) strings))
 
-;; TODO fix parsing to check whether it's a string first
 (defn parse-double [txt]
 ;;  (infof "Parsing double: %s" txt)
   (Double/parseDouble txt))
@@ -53,14 +50,14 @@
   (- (- (math/expt 2 (parse-double z)) 1)
      (parse-double y)))
 
-(defn raw-grid-data [z x y]
-  (j/with-connection db-belonging
+(defn raw-grid-data [d z x y]
+  (j/with-connection (db-specs d)
     (j/with-query-results results
       ["SELECT grid FROM grids WHERE zoom_level = ? AND tile_column = ? AND tile_row = ?" z x (flip-y z y) ]
       (first results))))
 
-(defn raw-grid-tooltip-data [z x y]
-  (j/with-connection db-belonging
+(defn raw-grid-tooltip-data [d z x y]
+  (j/with-connection (db-specs d)
     (j/with-query-results results
       ["SELECT key_name, key_json FROM grid_data WHERE zoom_level = ? AND tile_column = ? AND tile_row = ?" z x (flip-y z y)]
       (doall results))))
@@ -71,33 +68,30 @@
 (defn create-json-data [ds]
   (into {} (map create-tooltip-data ds)))
 
-(defn join-grid-data [z x y]
-  (let [g (json/read-str (zlib-decompress (:grid (raw-grid-data z x y))) :key-fn keyword)]
+(defn join-grid-data [d z x y]
+  (let [g (json/read-str (zlib-decompress (:grid (raw-grid-data d z x y))) :key-fn keyword)]
     {:keys (:keys g)
-     :data (create-json-data (raw-grid-tooltip-data z x y))
+     :data (create-json-data (raw-grid-tooltip-data d z x y))
      :grid (:grid g)}))
 
-(defn format-grid-string [z x y]
-  (str "grid(" (json/write-str (join-grid-data z x y)) ");"))
+(defn format-grid-string [d z x y]
+  (str "grid(" (json/write-str (join-grid-data d z x y)) ");"))
 
 (defn grid-response [data]
   {:status 200
    :headers {"Content-Type" "application/json"}
    :body data})
 
-(defn get-grid [z x y]
-  (let [grid (raw-grid-data z x y)]
+(defn get-grid [d z x y]
+  (let [grid (raw-grid-data d z x y)]
     (if (nil? grid)
       {:status 404}
-      (grid-response (format-grid-string z x y)))))
-
-;; TODO works in repl, doesn't work in browser. THrows java.lang.String cannot be cast to clojure.lang.IFn
+      (grid-response (format-grid-string d z x y)))))
 
 ;; ROUTES
 (defroutes app-routes
-  (GET "/api/:z/:x/:y.png" [z x y] (get-tile z x y))
-  (GET "/api/:z/:x/:y.grid.json" [z x y] (get-grid z x y))
-  (GET "/" [] "<h1>Hello World</h1>")
+  (GET "/:d/:z/:x/:y.png" [d z x y] (get-tile d z x y))
+  (GET "/:d/:z/:x/:y.grid.json" [d z x y] (get-grid d z x y))
   (route/not-found "Page not found"))
 
 (def app
